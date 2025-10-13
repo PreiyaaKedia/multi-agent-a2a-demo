@@ -1,0 +1,11 @@
+a2a-sdk[http-server]>=0.3.3
+httpx>=0.25.0
+python-dotenv>=1.0.0
+click>=8.2.1
+sse-starlette>=2.3.6
+starlette>=0.46.2
+uvicorn>=0.35.0
+setuptools>=65.0.0
+google-adk>=1.8.0
+google-genai>=1.27.0
+litellm==1.74.9

@@ -1,0 +1,13 @@
+# Requirements specific to the tool_agent service - Updated Sept 24, 2025
+# Keep these minimal to speed deployments; add additional packages if required by local code.
+a2a-sdk[http-server]>=0.3.3
+mcp>=1.9.4
+httpx>=0.25.0
+python-dotenv>=1.0.0
+click>=8.2.1
+sse-starlette>=2.3.6
+starlette>=0.46.2
+uvicorn>=0.35.0
+semantic-kernel>=1.33.0
+# Cache buster for fresh deployment
+setuptools>=65.0.0

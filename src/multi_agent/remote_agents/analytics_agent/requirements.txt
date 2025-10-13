@@ -1,0 +1,15 @@
+# Requirements specific to the analytics_agent service
+# Keep these minimal to speed deployments; add additional packages if required by local code.
+a2a-sdk[http-server]>=0.3.3
+httpx>=0.25.0
+python-dotenv>=1.0.0
+click>=8.2.1
+sse-starlette>=2.3.6
+starlette>=0.46.2
+uvicorn>=0.35.0
+# Analytics/chart generation specific dependencies
+matplotlib>=3.7.0
+pandas>=2.0.0
+crewai>=0.65.0
+langchain-openai>=0.1.0
+pydantic>=2.0.0

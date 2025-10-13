@@ -1,0 +1,23 @@
+name: a2a-multi-agent
+services:
+  toolAgent:
+    project: ./src/multi_agent/remote_agents/tool_agent
+    language: python
+    host: appservice
+  reimbursementAgent:
+    project: ./src/multi_agent/remote_agents/reimbursement_agent
+    language: python
+    host: appservice
+  analyticsAgent:
+    project: ./src/multi_agent/remote_agents/analytics_agent
+    language: python
+    host: appservice
+infra:
+  provider: bicep
+  
+# Update resource names and parameters in infra/main.bicep or pass parameters during `azd up`.
+
+# Notes:
+# - This file gives azd enough information to link the project to the infra.
+# - You can run `azd up` from the repo root to provision infra and deploy all three agents.
+# - Each agent will be deployed to its own App Service instance with dedicated UAI for security.
