@@ -117,26 +117,230 @@ cp .env.example .env
 
 ### Deployment
 
+The project uses Azure Developer CLI (azd) with custom deployment hooks to handle the zip-based deployment process for Azure App Services.
+
 #### Option 1: Deploy All Services with Azure Developer CLI
 ```bash
-# Deploy all agents and infrastructure
+# Provision infrastructure and deploy all services
 azd up
 ```
 
 #### Option 2: Deploy Individual Components
 
-1. **Deploy MCP Server Function App**:
+1. **Provision Infrastructure** (if not already done):
+```bash
+azd provision
+```
+
+2. **Deploy Individual Agent Services**:
+```bash
+# Deploy specific agents
+azd deploy toolAgent
+azd deploy reimbursementAgent  
+azd deploy analyticsAgent
+```
+
+3. **Deploy MCP Server Function App**:
 ```bash
 cd src/multi_agent/remote_agents/mcp_server_func_app
 func azure functionapp publish <your-function-app-name>
 ```
 
-2. **Deploy Agent Services**:
+#### Custom Deployment Process
+
+The deployment process uses PowerShell scripts integrated with azd hooks:
+
+1. **Pre-deployment**: Creates zip packages for each agent using `Compress-Archive`
+2. **Deployment**: Uses `az webapp deployment source config-zip` to deploy packages
+3. **Post-deployment**: Cleans up temporary files and validates deployments
+
+**Manual Deployment Alternative**:
+If you prefer to deploy manually using the traditional approach:
+
+```powershell
+# Create zip package for an agent
+$agentPath = "src/multi_agent/remote_agents/tool_agent"
+$zipPath = "tool_agent_package.zip"
+Compress-Archive -Path "$agentPath\*" -DestinationPath $zipPath -Force
+
+# Configure app settings before deployment
+az webapp config appsettings set `
+  --resource-group <your-resource-group> `
+  --name <your-app-service-name> `
+  --settings "WEBSITE_RUN_FROM_PACKAGE=0" "SCM_DO_BUILD_DURING_DEPLOYMENT=true"
+
+# Deploy to Azure App Service
+az webapp deployment source config-zip `
+  --resource-group <your-resource-group> `
+  --name <your-app-service-name> `
+  --src $zipPath
+
+# Configure startup command after deployment
+az webapp config set `
+  --resource-group <your-resource-group> `
+  --name <your-app-service-name> `
+  --startup-file 'uvicorn app:app --host 0.0.0.0 --port $PORT'
+
+# Clean up
+Remove-Item $zipPath
+```
+
+#### Setting up azd Deploy Integration
+
+To integrate your zip-based deployment with `azd deploy`, create deployment hooks:
+
+1. **Create deployment hook directory**:
 ```bash
-# Deploy each agent to Azure App Service
-azd deploy toolAgent
-azd deploy reimbursementAgent  
-azd deploy analyticsAgent
+mkdir -p .azure/hooks
+```
+
+2. **Create pre-deployment hook** (`.azure/hooks/predeploy.ps1`):
+```powershell
+# Pre-deployment hook to create zip packages
+param($serviceName)
+
+Write-Host "Creating deployment package for $serviceName..."
+
+$projectPaths = @{
+    "toolAgent" = "src/multi_agent/remote_agents/tool_agent"
+    "reimbursementAgent" = "src/multi_agent/remote_agents/reimbursement_agent"
+    "analyticsAgent" = "src/multi_agent/remote_agents/analytics_agent"
+}
+
+if ($projectPaths.ContainsKey($serviceName)) {
+    $sourcePath = $projectPaths[$serviceName]
+    $zipPath = "${serviceName}_package.zip"
+    
+    if (Test-Path $zipPath) {
+        Remove-Item $zipPath -Force
+    }
+    
+    Compress-Archive -Path "$sourcePath\*" -DestinationPath $zipPath -Force
+    Write-Host "Package created: $zipPath"
+}
+```
+
+3. **Create deployment hook** (`.azure/hooks/deploy.ps1`):
+```powershell
+# Custom deployment hook using az webapp
+param($serviceName, $resourceGroupName)
+
+Write-Host "Configuring and deploying $serviceName to Azure App Service..."
+
+$zipPath = "${serviceName}_package.zip"
+
+if (Test-Path $zipPath) {
+    # Get the app service name from azd environment
+    $appServiceName = azd env get-values | Select-String "${serviceName}Name" | ForEach-Object { $_.ToString().Split('=')[1].Trim('"') }
+    
+    if ($appServiceName) {
+        # Pre-deployment: Configure app settings for package deployment
+        Write-Host "Configuring app settings for $appServiceName..."
+        az webapp config appsettings set `
+            --resource-group $resourceGroupName `
+            --name $appServiceName `
+            --settings "WEBSITE_RUN_FROM_PACKAGE=0" "SCM_DO_BUILD_DURING_DEPLOYMENT=true"
+        
+        # Deploy the package
+        Write-Host "Deploying package to $appServiceName..."
+        az webapp deployment source config-zip `
+            --resource-group $resourceGroupName `
+            --name $appServiceName `
+            --src $zipPath
+        
+        Write-Host "Successfully deployed $serviceName to $appServiceName"
+    } else {
+        Write-Error "Could not find app service name for $serviceName"
+    }
+} else {
+    Write-Error "Package not found: $zipPath"
+}
+```
+
+4. **Create post-deployment cleanup** (`.azure/hooks/postdeploy.ps1`):
+```powershell
+# Post-deployment cleanup and configuration
+param($serviceName, $resourceGroupName)
+
+Write-Host "Post-deployment configuration for $serviceName..."
+
+# Configure startup command for specific services
+$startupCommands = @{
+    "toolAgent" = "uvicorn app:app --host 0.0.0.0 --port `$PORT"
+    "reimbursementAgent" = "uvicorn app:app --host 0.0.0.0 --port `$PORT"
+    "analyticsAgent" = "uvicorn app:app --host 0.0.0.0 --port `$PORT"
+}
+
+if ($startupCommands.ContainsKey($serviceName)) {
+    $appServiceName = azd env get-values | Select-String "${serviceName}Name" | ForEach-Object { $_.ToString().Split('=')[1].Trim('"') }
+    
+    if ($appServiceName) {
+        Write-Host "Setting startup command for $appServiceName..."
+        az webapp config set `
+            --resource-group $resourceGroupName `
+            --name $appServiceName `
+            --startup-file $startupCommands[$serviceName]
+        
+        Write-Host "Startup command configured for $serviceName"
+    }
+}
+
+# Clean up deployment package
+$zipPath = "${serviceName}_package.zip"
+if (Test-Path $zipPath) {
+    Remove-Item $zipPath -Force
+    Write-Host "Cleaned up package: $zipPath"
+}
+```
+
+5. **Update azure.yaml** to use deployment hooks:
+```yaml
+name: a2a-multi-agent
+services:
+  toolAgent:
+    project: ./src/multi_agent/remote_agents/tool_agent
+    language: python
+    host: appservice
+    hooks:
+      predeploy:
+        shell: pwsh
+        run: .azure/hooks/predeploy.ps1 toolAgent
+      deploy:
+        shell: pwsh  
+        run: .azure/hooks/deploy.ps1 toolAgent $AZURE_RESOURCE_GROUP
+      postdeploy:
+        shell: pwsh
+        run: .azure/hooks/postdeploy.ps1 toolAgent $AZURE_RESOURCE_GROUP
+  reimbursementAgent:
+    project: ./src/multi_agent/remote_agents/reimbursement_agent
+    language: python
+    host: appservice
+    hooks:
+      predeploy:
+        shell: pwsh
+        run: .azure/hooks/predeploy.ps1 reimbursementAgent
+      deploy:
+        shell: pwsh
+        run: .azure/hooks/deploy.ps1 reimbursementAgent $AZURE_RESOURCE_GROUP
+      postdeploy:
+        shell: pwsh
+        run: .azure/hooks/postdeploy.ps1 reimbursementAgent $AZURE_RESOURCE_GROUP
+  analyticsAgent:
+    project: ./src/multi_agent/remote_agents/analytics_agent
+    language: python
+    host: appservice
+    hooks:
+      predeploy:
+        shell: pwsh
+        run: .azure/hooks/predeploy.ps1 analyticsAgent
+      deploy:
+        shell: pwsh
+        run: .azure/hooks/deploy.ps1 analyticsAgent $AZURE_RESOURCE_GROUP
+      postdeploy:
+        shell: pwsh
+        run: .azure/hooks/postdeploy.ps1 analyticsAgent $AZURE_RESOURCE_GROUP
+infra:
+  provider: bicep
 ```
 
 ## 🔄 A2A Protocol Implementation
@@ -202,7 +406,70 @@ The project includes Bicep templates for Azure infrastructure deployment:
 - **Logging**: Comprehensive logging across all components
 - **Health Checks**: Service availability and readiness endpoints
 
-## 🤝 Contributing
+## � Testing
+
+Run health checks and tests:
+```bash
+# Test individual agent health
+python src/multi_agent/remote_agents/tool_agent/test_health.py
+
+# Test A2A communication
+python src/multi_agent/host_agent/test_routing.py
+```
+
+## 🚨 Troubleshooting
+
+### Deployment Issues
+
+**azd deploy not working with zip-based deployment:**
+- Ensure PowerShell execution policy allows script execution: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+- Verify Azure CLI is installed and authenticated: `az account show`
+- Check that deployment hooks have proper permissions and paths
+
+**Manual deployment fallback:**
+```powershell
+# If azd deploy fails, use manual deployment
+$agents = @("toolAgent", "reimbursementAgent", "analyticsAgent")
+foreach ($agent in $agents) {
+    $sourcePath = "src/multi_agent/remote_agents/$($agent.ToLower() -replace 'agent', '_agent')"
+    $zipPath = "${agent}_package.zip"
+    
+    Compress-Archive -Path "$sourcePath\*" -DestinationPath $zipPath -Force
+    
+    # Get resource group and app service name from azd
+    $resourceGroup = azd env get-values | Select-String "AZURE_RESOURCE_GROUP" | ForEach-Object { $_.ToString().Split('=')[1].Trim('"') }
+    $appServiceName = azd env get-values | Select-String "${agent}Name" | ForEach-Object { $_.ToString().Split('=')[1].Trim('"') }
+    
+    # Pre-deployment: Configure app settings
+    Write-Host "Configuring app settings for $appServiceName..."
+    az webapp config appsettings set `
+        --resource-group $resourceGroup `
+        --name $appServiceName `
+        --settings "WEBSITE_RUN_FROM_PACKAGE=0" "SCM_DO_BUILD_DURING_DEPLOYMENT=true"
+    
+    # Deploy the package
+    Write-Host "Deploying $agent..."
+    az webapp deployment source config-zip --resource-group $resourceGroup --name $appServiceName --src $zipPath
+    
+    # Post-deployment: Configure startup command
+    Write-Host "Configuring startup command for $appServiceName..."
+    az webapp config set `
+        --resource-group $resourceGroup `
+        --name $appServiceName `
+        --startup-file "uvicorn app:app --host 0.0.0.0 --port `$PORT"
+    
+    Remove-Item $zipPath -Force
+    Write-Host "$agent deployment completed successfully"
+}
+```
+
+**Common Issues:**
+- **Permission errors**: Ensure your account has Contributor role on the resource group
+- **Package size limits**: Azure App Service has deployment size limits (typically 2GB)
+- **Startup failures**: Check Application Insights logs for detailed error information
+- **Port binding issues**: Ensure agents use the `PORT` environment variable correctly
+
+## �🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
