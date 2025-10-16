@@ -34,6 +34,9 @@ client = AzureContentUnderstandingClient(
     # x_ms_useragent="azure-ai-content-understanding-python/field_extraction", # This header is used for sample usage telemetry, please comment out this line if you want to opt out.
 )
 
+## Create custom analyzer to extract fields from receipts
+# Uncomment below lines if you want to create a new analyzer.
+
 # CUSTOM_ANALYZER_ID = "invoice-extraction-demo"
 # response = client.begin_create_analyzer(CUSTOM_ANALYZER_ID, analyzer_template_path=analyzer_template_path)
 # result = client.poll_result(response)
@@ -42,19 +45,6 @@ client = AzureContentUnderstandingClient(
 
 # response = client.begin_analyze(CUSTOM_ANALYZER_ID, file_location=analyzer_sample_file_path)
 # result_json = client.poll_result(response)
-
-# extracted_result_json = result_json['result']['contents'][0]
-
-# items = []
-# if "fields" in extracted_result_json:
-#     extracted_fields = extracted_result_json['fields']
-#     for field_name, field_value in extracted_fields.items():
-#         if isinstance(field_value, dict) and 'valueString' in field_value:
-#             vendorName = field_value.get('valueString', '')
-#         elif isinstance(field_value, dict) and field_value['type'] == 'array':
-#             for  array in field_value['valueArray']:
-#                 items.append({"vendorName" : vendorName, "item_description" : array['valueObject']['Description']['valueString'], "amount" : array['valueObject']["Amount"]["valueNumber"]})
-
 
 def get_extracted_content(analyzer_id = "invoice-extraction-demo", file_location = "./data/invoice.png"):
     response = client.begin_analyze(analyzer_id, file_location=file_location)
@@ -74,5 +64,5 @@ def get_extracted_content(analyzer_id = "invoice-extraction-demo", file_location
                     items.append({"vendorName" : vendorName, "item_description" : array['valueObject']['Description']['valueString'], "amount" : array['valueObject']["Amount"]["valueNumber"]})
     return items
 
-items = get_extracted_content(file_location="https://stzsqp7uodjlobu.blob.core.windows.net/images/ReimbursementReport_PriyaKedia_InternalMeeting/Cab_To_MMT_Jun04.pdf")
+items = get_extracted_content(file_location="path/to/your/file.png")
 print(json.dumps(items, indent=2))
