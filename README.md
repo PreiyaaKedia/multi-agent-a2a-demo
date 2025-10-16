@@ -4,7 +4,7 @@ A comprehensive demonstration of the Agent-to-Agent (A2A) protocol enabling seam
 
 ## 🏗️ Architecture Overview
 
-![A2A Workflow](https://raw.githubusercontent.com/PreiyaaKedia/multi-agent-a2a-demo/main/a2a-image.jpeg)
+![A2A Workflow](https://raw.githubusercontent.com/PreiyaaKedia/multi-agent-a2a-demo/main/a2a-image.png)
 
 This demo implements a multi-agent system where specialized agents collaborate to handle complex business workflows:
 
