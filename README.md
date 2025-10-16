@@ -1,0 +1,235 @@
+# Multi-Agent A2A Sample Demo
+
+A comprehensive demonstration of the Agent-to-Agent (A2A) protocol enabling seamless collaboration between AI agents across different frameworks and platforms. This project showcases how agents built with Google ADK, CrewAI, and Azure AI Foundry Agent service can communicate and collaborate through standardized A2A protocol.
+
+## 🏗️ Architecture Overview
+
+![A2A Workflow](./a2a-image.jpeg)
+
+This demo implements a multi-agent system where specialized agents collaborate to handle complex business workflows:
+
+- **Routing Agent**: Discovers and routes tasks to appropriate agents based on capabilities
+- **Invoice Extraction Agent** (tool_agent): Extracts structured data from receipts and invoices using MCP server
+- **Reimbursement Agent**: Handles expense reimbursement workflows using Google ADK
+- **Analytics Agent**: Creates charts and visualizations using CrewAI
+- **MCP Server**: Azure Function App providing document processing capabilities
+
+## 🤖 Agent Components
+
+### 1. Routing Agent
+- **Framework**: Azure AI Foundry Agent service with Semantic Kernel
+- **Location**: `src/multi_agent/host_agent/routing_agent.py`
+- **Purpose**: Orchestrates agent discovery and task routing based on agent cards and capabilities
+- **Features**:
+  - Dynamic agent discovery via A2A protocol
+  - Intelligent task assignment based on agent capabilities
+  - Context-aware routing decisions
+
+### 2. Invoice Extraction Agent (Tool Agent)
+- **Framework**: Azure AI Foundry Agent service with Semantic Kernel + MCP integration
+- **Location**: `src/multi_agent/remote_agents/tool_agent/`
+- **Purpose**: Extracts structured information from uploaded receipts and invoices
+- **Features**:
+  - MCP server integration for document processing
+  - Azure Content Understanding for intelligent extraction
+  - Structured data output for downstream processing
+
+### 3. Reimbursement Agent
+- **Framework**: Google ADK (Agent Development Kit)
+- **Location**: `src/multi_agent/remote_agents/reimbursement_agent/`
+- **Purpose**: Processes expense reimbursement requests and workflows
+- **Features**:
+  - Expense form creation and validation
+  - Reimbursement workflow management
+  - Integration with expense tracking systems
+
+### 4. Analytics Agent
+- **Framework**: CrewAI
+- **Location**: `src/multi_agent/remote_agents/analytics_agent/`
+- **Purpose**: Creates data visualizations and analytical insights
+- **Features**:
+  - Chart and graph generation using matplotlib
+  - Data analysis and visualization
+  - PDF report generation
+
+### 5. MCP Server Function App
+- **Platform**: Azure Functions
+- **Location**: `src/multi_agent/remote_agents/mcp_server_func_app/`
+- **Purpose**: Provides Model Context Protocol (MCP) server for document processing
+- **Features**:
+  - Blob storage integration for file management
+  - Azure Content Understanding for document analysis
+  - PDF conversion and structured data extraction
+  - RESTful API endpoints for agent integration
+
+## 🔧 Technology Stack
+
+### Core Frameworks
+- **A2A Protocol**: Agent-to-Agent communication standard
+- **Azure AI Foundry**: Agent hosting and management
+- **Google ADK**: Agent development and deployment
+- **CrewAI**: Multi-agent orchestration framework
+- **Semantic Kernel**: AI orchestration and integration
+- **Azure Functions**: Serverless compute for MCP server
+
+### AI Services
+- **Azure OpenAI**: Large language model provider via LiteLLM
+- **Azure Content Understanding**: Document intelligence and extraction
+- **LiteLLM**: Universal LLM gateway supporting multiple providers
+
+### Infrastructure
+- **Azure App Service**: Agent hosting platform
+- **Azure Blob Storage**: Document and file storage
+- **Azure Bicep**: Infrastructure as Code
+- **Azure Developer CLI (azd)**: Deployment automation
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Azure subscription with appropriate permissions
+- Python 3.8+
+- Node.js 18+
+- Azure CLI
+- Azure Developer CLI (azd)
+
+### Environment Setup
+
+1. **Clone the repository**:
+```bash
+git clone <repository-url>
+cd multi-agent-a2a-sample-demo
+```
+
+2. **Install dependencies**:
+```bash
+# Python dependencies
+pip install -r requirements.txt
+
+# Node.js dependencies
+npm install
+```
+
+3. **Configure environment variables**:
+```bash
+cp .env.example .env
+# Edit .env with your Azure and service configurations
+```
+
+### Deployment
+
+#### Option 1: Deploy All Services with Azure Developer CLI
+```bash
+# Deploy all agents and infrastructure
+azd up
+```
+
+#### Option 2: Deploy Individual Components
+
+1. **Deploy MCP Server Function App**:
+```bash
+cd src/multi_agent/remote_agents/mcp_server_func_app
+func azure functionapp publish <your-function-app-name>
+```
+
+2. **Deploy Agent Services**:
+```bash
+# Deploy each agent to Azure App Service
+azd deploy toolAgent
+azd deploy reimbursementAgent  
+azd deploy analyticsAgent
+```
+
+## 🔄 A2A Protocol Implementation
+
+### Agent Discovery
+Each agent publishes an agent card at `/.well-known/agent.json` containing:
+- Agent capabilities and skills
+- Supported input/output modalities
+- Communication endpoints
+- Protocol version information
+
+### Message Flow
+1. **Discovery Phase**: Routing agent discovers available agents via agent cards
+2. **Task Assignment**: Based on user query and agent capabilities
+3. **Inter-Agent Communication**: Standardized A2A message exchange
+4. **Result Aggregation**: Consolidated response from multiple agents
+
+### Protocol Standards
+- **JSON-RPC 2.0**: Underlying communication protocol
+- **Standardized Payloads**: Consistent message formats across frameworks
+- **Agent Cards**: Self-describing agent capabilities
+- **Task Lifecycle Management**: Stateful task tracking and updates
+
+## 📋 Usage Examples
+
+### Invoice Processing Workflow
+```
+User: "Extract information from this receipt and process reimbursement"
+├── Routing Agent → Tool Agent (receipt extraction)
+├── Tool Agent → MCP Server (document processing)
+├── Routing Agent → Reimbursement Agent (expense processing)
+└── Combined response with structured data and reimbursement status
+```
+
+### Analytics and Reporting
+```
+User: "Create a chart showing expense trends"
+├── Routing Agent → Analytics Agent (visualization)
+├── Analytics Agent → Chart generation
+└── Response with generated charts and insights
+```
+
+## 🏗️ Infrastructure
+
+The project includes Bicep templates for Azure infrastructure deployment:
+
+- **main.bicep**: Core infrastructure resources
+- **static-web-app.bicep**: Frontend hosting configuration
+- **app/api.bicep**: API and function app resources
+- **security/**: RBAC and security configurations
+
+## 🔒 Security
+
+- **Managed Identity**: Azure services use managed identities for authentication
+- **RBAC**: Role-based access control for resource permissions
+- **Key Vault Integration**: Secure storage for sensitive configuration
+- **Network Security**: Proper network isolation and access controls
+
+## 📊 Monitoring and Observability
+
+- **Application Insights**: Telemetry and performance monitoring
+- **Azure Monitor**: Infrastructure and service health monitoring
+- **Logging**: Comprehensive logging across all components
+- **Health Checks**: Service availability and readiness endpoints
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🔗 Related Resources
+
+- [A2A Protocol Documentation](https://a2a-protocol.org/latest/)
+- [A2A Python SDK](https://github.com/a2aproject/a2a-python)
+- [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol)
+- [Azure AI Foundry Documentation](https://docs.microsoft.com/en-us/azure/ai-foundry/)
+- [Google ADK Documentation](https://developers.google.com/adk)
+- [CrewAI Framework](https://docs.crewai.com/)
+
+## 🆘 Support
+
+For questions and support:
+- Open an issue in this repository
+- Check the [A2A Protocol documentation](https://a2a-protocol.org/latest/)
+- Review the [Azure AI documentation](https://docs.microsoft.com/en-us/azure/ai/)
+
+---
+
+*This demo showcases the power of standardized agent communication protocols in building complex, multi-framework AI systems that can collaborate seamlessly across different platforms and technologies.*
