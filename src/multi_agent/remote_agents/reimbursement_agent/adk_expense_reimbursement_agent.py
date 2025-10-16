@@ -135,7 +135,7 @@ class ReimbursementAgent:
     def _build_agent(self) -> LlmAgent:
         """Builds the LLM agent for the reimbursement agent."""
         return LlmAgent(
-            model=LiteLlm(model=f"azure/{os.getenv('AZURE_OPENAI_DEPLOYMENT')}"),
+            model=LiteLlm(model=f"azure/{os.getenv('AZURE_OPENAI_DEPLOYMENT_REIMBURSEMENT_AGENT', "gpt-4.1")}"),
             name='reimbursement_agent',
             description=(
                 'This agent handles the reimbursement process for the employees'

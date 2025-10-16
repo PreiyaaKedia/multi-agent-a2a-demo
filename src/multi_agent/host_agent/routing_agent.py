@@ -98,6 +98,10 @@ class RoutingAgent:
         )
         self.azure_agent = None
         self.current_thread = None
+        
+        # Track the last agent called and its response for better UI display
+        self.last_called_agent = None
+        self.last_agent_response = None
 
     async def _async_init_components(
         self, remote_agent_addresses: list[str]
@@ -347,11 +351,11 @@ Always be helpful and route requests to the most appropriate agent."""
             state['task_id'] = task.id
             state['context_id'] = task.context_id
 
-            # Extract the agent's question/message
+            # Extract the agent's question/message (keep original simple logic)
             agent_question = task.status.message.parts[
                 0].root.text if task.status.message.parts else "Input required"
             print(f"DEBUG: Agent requires input: {agent_question}")
-            return f"The {agent_name} agent needs more information: {agent_question}"
+            return f"**🔧 {agent_name}** needs more information: {agent_question}"
 
         # Check if task is completed
         elif task.status.state == TaskState.completed:
@@ -365,7 +369,7 @@ Always be helpful and route requests to the most appropriate agent."""
                     # Check if it's a text part
                     if hasattr(part.root, 'text'):
                         agent_response = part.root.text
-                        response_content = f"Response from {agent_name}: {agent_response}"
+                        response_content = f"**🔧 {agent_name}**: {agent_response}"
                     
                     # Check if it's a file part (like an image)
                     elif hasattr(part.root, 'kind') and part.root.kind == 'file':
@@ -381,11 +385,11 @@ Always be helpful and route requests to the most appropriate agent."""
                         }
                         print(f"DEBUG: File info - Name: {file_info.name}, MIME Type: {file_info.mime_type}")
                     else:
-                        response_content = f"Response from {agent_name}: Received unknown artifact type"
+                        response_content = f"**🔧 {agent_name}**: Received unknown artifact type"
                 else:
-                    response_content = f"Response from {agent_name}: No content in artifact"
+                    response_content = f"**🔧 {agent_name}**: No content in artifact"
             else:
-                response_content = f"Response from {agent_name}: No artifacts returned"
+                response_content = f"**🔧 {agent_name}**: No artifacts returned"
 
             # Clean up task_id since task is complete, but keep context_id for conversation continuity
             state['task_id'] = None
@@ -409,6 +413,9 @@ Always be helpful and route requests to the most appropriate agent."""
             return "Azure AI Thread not initialized. Please ensure the agent is properly created."
         
         try:
+            # Clear previous agent tracking
+            self.last_called_agent = None
+            
             # Initialize session if needed
             self.initialize_session()
             
@@ -482,9 +489,20 @@ Always be helpful and route requests to the most appropriate agent."""
                 print(msg)
                 if msg.role == "assistant" and msg.text_messages:
                     last_text = msg.text_messages[-1]
-                    return last_text.text.value
+                    response_text = last_text.text.value
+                    
+                    # Determine proper agent attribution for the response
+                    if "**🔧" in response_text or "**🤖" in response_text:
+                        # Already has agent name formatting, return as-is
+                        return response_text
+                    elif self.last_called_agent:
+                        # Sub-agent was involved, give proper attribution
+                        return f"**🔧 {self.last_called_agent}** (via **🤖 Azure AI Routing Agent**): {response_text}"
+                    else:
+                        # Direct Azure AI response
+                        return f"**🤖 Azure AI Routing Agent**: {response_text}"
             
-            return "No response received from agent."
+            return "**🤖 Azure AI Routing Agent**: No response received from agent."
             
         except Exception as e:
             error_msg = f"Error in process_user_message: {e}"
@@ -508,9 +526,13 @@ Always be helpful and route requests to the most appropriate agent."""
                     
                     if function_name == "send_message":
                         try:
+                            # Track which agent was called for final attribution
+                            agent_name = function_args["agent_name"]
+                            self.last_called_agent = agent_name
+                            
                             # Call our send_message method
                             result = await self.send_message(
-                                agent_name=function_args["agent_name"],
+                                agent_name=agent_name,
                                 task=function_args["task"]
                             )
                             # Convert result to JSON string
@@ -573,7 +595,7 @@ def _get_initialized_routing_agent_sync() -> RoutingAgent:
     async def _async_main() -> RoutingAgent:
         routing_agent_instance = await RoutingAgent.create(
             remote_agent_addresses=[
-                os.getenv('TOOL_AGENT_URL', 'https://dev-toolagent-web.azurewebsites.net/'),
+                os.getenv('TOOL_AGENT_URL', 'http://localhost:10002'),
                 # os.getenv('PLAYWRIGHT_AGENT_URL', 'http://localhost:10001'),
                 os.getenv('CHARTGENERATION_CREWAI_AGENT_URL', 'http://localhost:10011'),
                 os.getenv('REIMBURSEMENT_AGENT_URL', 'http://localhost:10005'),
