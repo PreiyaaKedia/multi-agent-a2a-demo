@@ -4,7 +4,7 @@ A comprehensive demonstration of the Agent-to-Agent (A2A) protocol enabling seam
 
 ## 🏗️ Architecture Overview
 
-![A2A Workflow](./a2a-image.jpeg)
+![A2A Workflow](a2a-image.jpeg)
 
 This demo implements a multi-agent system where specialized agents collaborate to handle complex business workflows:
 
@@ -87,10 +87,10 @@ This demo implements a multi-agent system where specialized agents collaborate t
 
 ### Prerequisites
 - Azure subscription with appropriate permissions
-- Python 3.8+
+- Python 3.13+
 - Node.js 18+
 - Azure CLI
-- Azure Developer CLI (azd)
+- Azure Developer CLI (azd)F
 
 ### Environment Setup
 
@@ -405,17 +405,6 @@ The project includes Bicep templates for Azure infrastructure deployment:
 - **Azure Monitor**: Infrastructure and service health monitoring
 - **Logging**: Comprehensive logging across all components
 - **Health Checks**: Service availability and readiness endpoints
-
-## � Testing
-
-Run health checks and tests:
-```bash
-# Test individual agent health
-python src/multi_agent/remote_agents/tool_agent/test_health.py
-
-# Test A2A communication
-python src/multi_agent/host_agent/test_routing.py
-```
 
 ## 🚨 Troubleshooting
 
